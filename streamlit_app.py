@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime
 import os
 
-
 # SETUP FILE DAN KONSTANTA
 os.makedirs("data", exist_ok=True)
 PRODUKSI_FILE = 'data/data_produksi.csv'
@@ -11,18 +10,17 @@ PENJUALAN_FILE = 'data/data_penjualan.csv'
 KEUANGAN_FILE = 'data/laporan_keuangan.csv'
 STOK_FILE = 'data/stok.csv'
 PENGISIAN_STOK_FILE = 'data/pengisian_stok.csv'
-HARGA_BIBIT = 10000
-HARGA_PUPUK = 5000
-HARGA_PESTISIDA = 15000
+HARGA_BIBIT = 100
+HARGA_PUPUK = 30000
 HARGA_KOL = 4000
 
 # FUNGSI BANTUAN
 def simpan_data(df, file):
-    df.to_csv(file)
+    df.to_csv(file, index=False)
 
 def load_data(file):
     if os.path.exists(file):
-        return pd.read_csv(file, index_col=0)
+        return pd.read_csv(file)
     return pd.DataFrame()
 
 def load_stok():
@@ -70,7 +68,6 @@ else:
             st.session_state["login"] = False
             st.rerun()
 
-
     # HALAMAN HOME
     if halaman == 'Home':
         st.title(":material/home: Home")
@@ -85,46 +82,76 @@ else:
         - Penambahan dan pengurangan stok kol
         """)
 
-    # HALAMAN PRODUKSI
+        # HALAMAN PRODUKSI
     elif halaman == 'Produksi':
         st.title(":material/box_add: Tambah Transaksi Produksi")
         tanggal = st.date_input("Tanggal Produksi", value=datetime.today())
-        bibit = st.number_input("Bibit (Kg)", 0)
-        pupuk = st.number_input("Pupuk (Kg)", 0)
-        pestisida = st.number_input("Pestisida (Liter)", 0)
-        total = bibit * HARGA_BIBIT + pupuk * HARGA_PUPUK + pestisida * HARGA_PESTISIDA
+
+        bibit = st.number_input("Bibit (Rp 100/batang)", min_value=0, step=1)
+        pupuk = st.number_input("Pupuk (Rp 30.000/kantong)", min_value=0, step=1)
+        biaya_perawatan = st.number_input("Biaya Perawatan (Rp)", min_value=0)
+        biaya_tenaga_kerja = st.number_input("Biaya Tenaga Kerja (Rp)", min_value=0)
+
+        total = bibit * HARGA_BIBIT + pupuk * HARGA_PUPUK + biaya_perawatan + biaya_tenaga_kerja
         st.info(f"Total Biaya Produksi: Rp {total:,.0f}")
 
         if st.button(":material/save: Simpan Produksi"):
             df = load_data(PRODUKSI_FILE)
             new = pd.DataFrame([{
-                "Tanggal": tanggal,
-                "Bibit (Kg)": bibit,
-                "Pupuk (Kg)": pupuk,
-                "Pestisida (L)": pestisida,
+                "Tanggal": tanggal.strftime("%Y-%m-%d"),
+                "Bibit (Batang)": bibit,
+                "Pupuk (Kantong)": pupuk,
+                "Biaya Perawatan": biaya_perawatan,
+                "Biaya Tenaga Kerja": biaya_tenaga_kerja,
                 "Total Biaya": total
             }])
             df = pd.concat([df, new], ignore_index=True)
             simpan_data(df, PRODUKSI_FILE)
 
             df_keuangan = load_data(KEUANGAN_FILE)
-            tanggal_str = tanggal.strftime("%Y-%m-%d")
             transaksi_keuangan = pd.DataFrame([
-                {"Tanggal": tanggal_str, "Keterangan": "Beban Produksi", "Debit": total, "Kredit": 0},
-                {"Tanggal": tanggal_str, "Keterangan": "     Kas", "Debit": 0, "Kredit": total}
+                {"Tanggal": tanggal.strftime("%Y-%m-%d"), "Keterangan": "Beban Produksi", "Debit": total, "Kredit": 0},
+                {"Tanggal": tanggal.strftime("%Y-%m-%d"), "Keterangan": "     Kas", "Debit": 0, "Kredit": total}
             ])
             df_keuangan = pd.concat([df_keuangan, transaksi_keuangan], ignore_index=True)
             simpan_data(df_keuangan, KEUANGAN_FILE)
 
             st.success("✅ Data produksi dan laporan keuangan disimpan!")
+            st.rerun()
 
         st.subheader("Riwayat Transaksi Produksi")
         produksi_df = load_data(PRODUKSI_FILE)
         if not produksi_df.empty:
-            produksi_df["Tanggal"] = pd.to_datetime(produksi_df["Tanggal"])
-            st.dataframe(produksi_df.sort_values("Tanggal", ascending=False))
+            produksi_df["Tanggal"] = pd.to_datetime(produksi_df["Tanggal"], errors='coerce')
+            produksi_df = produksi_df.dropna(subset=['Tanggal'])
+            produksi_df = produksi_df.sort_values("Tanggal", ascending=False).reset_index(drop=True)
+
+            for i, row in produksi_df.iterrows():
+                with st.expander(f"📅 {row['Tanggal'].strftime('%d-%m-%Y')} | Biaya: Rp {row['Total Biaya']:,.0f}"):
+                    st.write(f"Tanggal: {row['Tanggal'].strftime('%Y-%m-%d')}")
+                    st.write(f"Bibit (Batang): {row['Bibit (Batang)']}")
+                    st.write(f"Pupuk (Kantong): {row['Pupuk (Kantong)']}")
+                    st.write(f"Biaya Perawatan: Rp {row['Biaya Perawatan']:,.0f}")
+                    st.write(f"Biaya Tenaga Kerja: Rp {row.get('Biaya Tenaga Kerja', 0):,.0f}")
+                    st.write(f"Total Biaya: Rp {row['Total Biaya']:,.0f}")
+                    if st.button(f"🗑 Hapus Produksi {i}", key=f"hapus_produksi_{i}"):
+                        produksi_df = produksi_df.drop(index=i).reset_index(drop=True)
+                        simpan_data(produksi_df, PRODUKSI_FILE)
+
+                        df_keuangan = load_data(KEUANGAN_FILE)
+                        tanggal_str = row['Tanggal'].strftime("%Y-%m-%d")
+                        df_keuangan = df_keuangan[~(
+                            (df_keuangan['Tanggal'] == tanggal_str) &
+                            ((df_keuangan['Keterangan'].str.strip() == "Beban Produksi") & (df_keuangan['Debit'] == row['Total Biaya'])) |
+                            ((df_keuangan['Keterangan'].str.strip() == "Kas") & (df_keuangan['Kredit'] == row['Total Biaya']))
+                        )]
+                        simpan_data(df_keuangan, KEUANGAN_FILE)
+
+                        st.success("✅ Transaksi produksi dan data keuangan terkait berhasil dihapus.")
+                        st.rerun()
         else:
             st.info("Belum ada data produksi.")
+
 
     # HALAMAN PENJUALAN
     elif halaman == 'Penjualan':
@@ -146,7 +173,7 @@ else:
             else:
                 df = load_data(PENJUALAN_FILE)
                 new = pd.DataFrame([{
-                    "Tanggal": tanggal_jual,
+                    "Tanggal": tanggal_jual.strftime("%Y-%m-%d"),
                     "Kode Transaksi": kode,
                     "Jumlah Kol (Kg)": jumlah,
                     "Total Penjualan": total
@@ -167,12 +194,40 @@ else:
                 simpan_data(df_keuangan, KEUANGAN_FILE)
 
                 st.success("✅ Data penjualan dan laporan keuangan disimpan!")
+                st.rerun()
 
         st.subheader("Riwayat Transaksi Penjualan")
         df_penjualan = load_data(PENJUALAN_FILE)
         if not df_penjualan.empty:
-            df_penjualan["Tanggal"] = pd.to_datetime(df_penjualan["Tanggal"])
-            st.dataframe(df_penjualan.sort_values("Tanggal", ascending=False))
+            df_penjualan["Tanggal"] = pd.to_datetime(df_penjualan["Tanggal"], errors='coerce')
+            df_penjualan = df_penjualan.dropna(subset=['Tanggal'])
+            df_penjualan = df_penjualan.sort_values("Tanggal", ascending=False).reset_index(drop=True)
+
+            for i, row in df_penjualan.iterrows():
+                with st.expander(f"📅 {row['Tanggal'].strftime('%d-%m-%Y')} | Penjualan: Rp {row['Total Penjualan']:,.0f}"):
+                    st.write(f"Tanggal: {row['Tanggal'].strftime('%Y-%m-%d')}")
+                    st.write(f"Kode Transaksi: {row['Kode Transaksi']}")
+                    st.write(f"Jumlah Kol (Kg): {row['Jumlah Kol (Kg)']}")
+                    st.write(f"Total Penjualan: Rp {row['Total Penjualan']:,.0f}")
+                    if st.button(f"🗑 Hapus Penjualan {i}", key=f"hapus_penjualan_{i}"):
+                        stok_kol = load_stok()
+                        stok_kol += row["Jumlah Kol (Kg)"]
+                        simpan_stok(stok_kol)
+
+                        df_penjualan = df_penjualan.drop(index=i).reset_index(drop=True)
+                        simpan_data(df_penjualan, PENJUALAN_FILE)
+
+                        df_keuangan = load_data(KEUANGAN_FILE)
+                        tanggal_str = row['Tanggal'].strftime("%Y-%m-%d")
+                        df_keuangan = df_keuangan[~(
+                            (df_keuangan['Tanggal'] == tanggal_str) &
+                            ((df_keuangan['Keterangan'].str.strip() == "Kas") & (df_keuangan['Debit'] == row['Total Penjualan'])) |
+                            ((df_keuangan['Keterangan'].str.strip() == "Penjualan Kol") & (df_keuangan['Kredit'] == row['Total Penjualan']))
+                        )]
+                        simpan_data(df_keuangan, KEUANGAN_FILE)
+
+                        st.success("✅ Transaksi penjualan dan data keuangan terkait berhasil dihapus.")
+                        st.rerun()
         else:
             st.info("Belum ada data penjualan.")
 
