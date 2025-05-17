@@ -62,7 +62,7 @@ else:
     #Navigasi
     st.markdown(f" Login sebagai: `{st.session_state['username']}`")
     with st.sidebar:
-        st.image("C:/Foto SIM/KOL.png", width=50)
+        st.image("assets/LOGO_KECIL.png", width=50)
         st.markdown(f":material/person: Login sebagai:\n`{st.session_state['username']}`")
         halaman = st.selectbox("Pilih Halaman", ["Home", "Produksi", "Penjualan", "Isi Stok", "Laporan"])
         st.session_state["halaman"] = halaman
@@ -74,7 +74,7 @@ else:
     # HALAMAN HOME
     if halaman == 'Home':
         st.title(":material/home: Home")
-        st.image('C:/Foto SIM/KOL ME.jpg', width=250)
+        st.image('assets/KOL_ME.jpg', width=250)
         st.markdown("""
         Selamat datang di aplikasi manajemen produksi dan penjualan KOL-ME!
 
