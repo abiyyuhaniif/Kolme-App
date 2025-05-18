@@ -10,6 +10,8 @@ PENJUALAN_FILE = 'data/data_penjualan.csv'
 KEUANGAN_FILE = 'data/laporan_keuangan.csv'
 STOK_FILE = 'data/stok.csv'
 PENGISIAN_STOK_FILE = 'data/pengisian_stok.csv'
+LOGIN_STATUS_FILE = 'data/login_status.csv'
+
 HARGA_BIBIT = 100
 HARGA_PUPUK = 30000
 HARGA_KOL = 4000
@@ -36,6 +38,25 @@ def simpan_stok(stok_baru):
     df = pd.DataFrame([{"Stok": stok_baru}])
     df.to_csv(STOK_FILE, index=False)
 
+# SISTEM CEK STATUS LOGIN
+def is_user_logged_in(username):
+    if os.path.exists(LOGIN_STATUS_FILE):
+        df = pd.read_csv(LOGIN_STATUS_FILE)
+        return username in df["username"].values
+    return False
+
+def set_user_login_status(username, status):
+    if status:  # login
+        df = pd.read_csv(LOGIN_STATUS_FILE) if os.path.exists(LOGIN_STATUS_FILE) else pd.DataFrame(columns=["username"])
+        if username not in df["username"].values:
+            df.loc[len(df)] = [username]
+            df.to_csv(LOGIN_STATUS_FILE, index=False)
+    else:  # logout
+        if os.path.exists(LOGIN_STATUS_FILE):
+            df = pd.read_csv(LOGIN_STATUS_FILE)
+            df = df[df["username"] != username]
+            df.to_csv(LOGIN_STATUS_FILE, index=False)
+
 # SISTEM LOGIN
 ALLOWED_USERS = ["admin1@kolme.com", "admin2@kolme.com", "admin3@kolme.com", "admin4@kolme.com"]
 PASSWORD = "kol123"
@@ -50,24 +71,48 @@ if not st.session_state["login"]:
 
     if st.button(":material/login: Login"):
         if username in ALLOWED_USERS and password == PASSWORD:
-            st.session_state["login"] = True
-            st.session_state["username"] = username
-            st.success("Login berhasil!")
-            st.rerun()
+            if is_user_logged_in(username):
+                st.error("❌ Pengguna ini sedang login di tempat lain.")
+            else:
+                set_user_login_status(username, True)
+                st.session_state["login"] = True
+                st.session_state["username"] = username
+                st.success("Login berhasil!")
+                st.rerun()
         else:
             st.error("Username atau password salah.")
+            
 else:
-    #Navigasi
-    st.markdown(f" Login sebagai: `{st.session_state['username']}`")
+    # Sidebar Navigasi
+    st.markdown(f"Login sebagai: `{st.session_state['username']}`")
     with st.sidebar:
         st.image("assets/LOGO_KECIL.png", width=50)
         st.markdown(f":material/person: Login sebagai:\n`{st.session_state['username']}`")
         halaman = st.selectbox("Pilih Halaman", ["Home", "Produksi", "Penjualan", "Isi Stok", "Laporan"])
         st.session_state["halaman"] = halaman
         if st.button(":material/logout: Logout"):
+            set_user_login_status(st.session_state["username"], False)
             st.session_state["login"] = False
+            st.session_state.pop("username", None)
             st.rerun()
 
+    # Halaman Konten
+    if halaman == "Home":
+        st.markdown("---")
+        st.write("Silakan pilih menu di samping untuk mengelola data produksi, penjualan, stok, dan laporan keuangan.")
+    elif halaman == "Produksi":
+        st.markdown("---")
+        # Konten produksi bisa ditambahkan di sini
+    elif halaman == "Penjualan":
+        st.markdown("---")
+        # Konten penjualan bisa ditambahkan di sini
+    elif halaman == "Isi Stok":
+        st.markdown("---")
+        # Konten isi stok bisa ditambahkan di sini
+    elif halaman == "Laporan":
+        st.markdown("---")
+        # Konten laporan bisa ditambahkan di sini
+        
     # HALAMAN HOME
     if halaman == 'Home':
         st.title(":material/home: Home")
